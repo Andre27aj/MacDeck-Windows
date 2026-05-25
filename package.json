@@ -1,0 +1,12 @@
+{
+  "name": "macdeck-windows",
+  "version": "1.0.0",
+  "description": "MacDeck server for Windows — control your PC from any device on the network",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

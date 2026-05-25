@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MacDeck">
+  <meta name="theme-color" content="#0d0d0d">
+  <link rel="manifest" href="/manifest.json">
+  <title>MacDeck</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0d0d0d;--card:#1a1a1a;--card2:#222;--border:#2a2a2a;
+      --text:#f0f0f0;--dim:#666;--accent:#6366f1;--accent2:#8b5cf6;
+      --green:#10b981;--red:#ef4444;--amber:#f59e0b;--r:12px;--gap:8px;
+    }
+    html,body{height:100%;background:var(--bg);color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+      overflow:hidden;-webkit-tap-highlight-color:transparent;user-select:none;}
+    button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;outline:none;}
+
+    /* ── Shell ── */
+    #app{
+      display:flex;flex-direction:column;
+      height:100dvh;
+      padding:max(env(safe-area-inset-top),8px) max(env(safe-area-inset-right),10px)
+              max(env(safe-area-inset-bottom),8px) max(env(safe-area-inset-left),10px);
+      gap:var(--gap);
+    }
+
+    /* ── Banner ── */
+    #banner{display:none;align-items:center;justify-content:center;gap:6px;
+      padding:5px 10px;border-radius:8px;font-size:12px;font-weight:600;flex-shrink:0;}
+    #banner.show{display:flex;}
+    #banner.err{background:var(--red);}
+    #banner.info{background:#3b82f6;}
+
+    /* ── Top bar ── */
+    #topbar{display:flex;align-items:center;justify-content:space-between;
+      flex-shrink:0;min-height:20px;}
+    #battery{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--dim);}
+    #settings-btn{font-size:15px;color:#444;padding:2px 6px;}
+    #settings-btn:hover{color:#888;}
+
+    /* ── Main ── */
+    #main{flex:1;display:flex;gap:var(--gap);min-height:0;}
+
+    /* ── Left panel ── */
+    #left{width:44%;display:flex;flex-direction:column;gap:var(--gap);min-width:0;}
+
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px;}
+    .clabel{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);}
+
+    /* Sliders card */
+    #sliders-card{flex:1;display:flex;flex-direction:column;gap:10px;min-height:0;}
+    .slider-row{display:flex;align-items:center;gap:10px;}
+    .slider-row .sicon{font-size:13px;width:16px;text-align:center;flex-shrink:0;}
+    .slider-row .sval{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;
+      width:28px;text-align:right;flex-shrink:0;color:var(--accent);}
+
+    .hslider{flex:1;height:60px;position:relative;cursor:pointer;touch-action:none;}
+    .hslider .track{position:absolute;inset:0;background:#111;border:1px solid var(--border);border-radius:30px;}
+    .hslider .fill{position:absolute;top:0;left:0;bottom:0;border-radius:30px;}
+    .hslider .thumb{position:absolute;top:50%;width:26px;height:26px;background:#fff;
+      border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 2px 6px rgba(0,0,0,.5);pointer-events:none;}
+    #vol-fill{background:linear-gradient(90deg,#4f46e5,#7c3aed);}
+    #brt-fill{background:linear-gradient(90deg,#d97706,#fbbf24);}
+
+    /* Mute panel */
+    #mute-panel{display:flex;gap:var(--gap);}
+    .mute-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
+      padding:8px 4px;border-radius:10px;border:1px solid var(--border);background:var(--card);
+      font-size:15px;transition:transform .1s,background .15s;}
+    .mute-btn:active{transform:scale(.93);}
+    .mute-btn .mlbl{font-size:9px;font-weight:600;color:var(--dim);}
+    .mute-btn.on{background:var(--red);border-color:var(--red);}
+    .mute-btn.on .mlbl{color:rgba(255,255,255,.85);}
+
+    /* ── Right panel ── */
+    #right{flex:1;display:flex;flex-direction:column;gap:var(--gap);min-width:0;min-height:0;}
+
+    /* Tab bar */
+    #tabbar{display:flex;gap:6px;flex-shrink:0;}
+    .tab{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;
+      padding:6px 8px;border-radius:8px;font-size:10px;font-weight:600;
+      border:1px solid var(--border);background:var(--card);color:#444;transition:all .15s;}
+    .tab.active{background:rgba(99,102,241,.15);border-color:rgba(99,102,241,.4);color:var(--accent);}
+
+    /* Pages */
+    #pages{flex:1;min-height:0;overflow:hidden;position:relative;}
+    .page{position:absolute;inset:0;display:none;overflow-y:auto;overflow-x:hidden;padding-bottom:4px;}
+    .page.active{display:block;}
+    .page::-webkit-scrollbar{width:0;}
+
+    /* Button grid */
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap);}
+
+    .dbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+      padding:8px 4px;border:1px solid rgba(99,102,241,.3);border-radius:var(--r);
+      background:var(--card);min-height:62px;transition:transform .1s,background .15s,border-color .15s;
+      position:relative;}
+    .dbtn:active{transform:scale(.91);}
+    .dbtn .dicon{font-size:20px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;}
+    .dbtn .dicon img{width:36px;height:36px;border-radius:8px;object-fit:cover;}
+    .dbtn .dlbl{font-size:9px;font-weight:600;color:var(--dim);text-align:center;
+      line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+    /* Running app */
+    .dbtn.running{border-color:var(--green);border-width:2px;background:rgba(16,185,129,.07);}
+
+    /* System btn variants */
+    .dbtn.sys{border-color:rgba(139,92,246,.3);}
+    .dbtn.sys .dicon{color:var(--accent2);}
+    .dbtn.sysc{border-color:rgba(99,102,241,.3);}
+    .dbtn.sysc .dicon{color:var(--accent);}
+    .dbtn.toggled{background:rgba(139,92,246,.2);border-color:var(--accent2);}
+
+    /* Flash */
+    @keyframes fok {0%{background:rgba(16,185,129,.35)}100%{background:var(--card)}}
+    @keyframes ferr{0%{background:rgba(239,68,68,.35) }100%{background:var(--card)}}
+    .fok {animation:fok  .4s ease-out forwards;}
+    .ferr{animation:ferr .4s ease-out forwards;}
+
+    /* Media bar */
+    #mediabar{display:flex;align-items:center;gap:8px;padding:8px 12px;
+      background:var(--card);border:1px solid var(--border);border-radius:var(--r);flex-shrink:0;}
+    #np{flex:1;min-width:0;}
+    #npt{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    #npa{font-size:9px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .mbtn{padding:6px 10px;border-radius:6px;background:var(--card2);color:var(--green);
+      font-size:14px;transition:transform .1s;flex-shrink:0;}
+    .mbtn:active{transform:scale(.88);}
+
+    /* ── Settings overlay ── */
+    #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;
+      align-items:center;justify-content:center;padding:20px;}
+    #overlay.show{display:flex;}
+    #settings{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+      padding:20px;width:100%;max-width:320px;}
+    #settings h2{font-size:16px;font-weight:700;margin-bottom:16px;}
+    #settings p{font-size:12px;color:var(--dim);margin-bottom:6px;}
+    #settings input{width:100%;padding:10px 12px;background:var(--card2);border:1px solid var(--border);
+      border-radius:8px;color:var(--text);font-size:15px;font-family:monospace;margin-bottom:16px;outline:none;}
+    #settings input:focus{border-color:var(--accent);}
+    #savebtn{width:100%;padding:10px;background:var(--accent);border-radius:8px;
+      font-size:14px;font-weight:600;color:#fff;}
+
+    /* ── Portrait ── */
+    @media(orientation:portrait){
+      #main{flex-direction:column;}
+      #left{width:100%;flex:0 0 auto;}
+      #sliders-card{flex:none;}
+      .hslider{height:50px;}
+      #right{flex:1;}
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="banner"></div>
+
+  <div id="topbar">
+    <div id="battery">
+      <span id="bat-icon">🔋</span>
+      <span id="bat-pct" style="display:none"></span>
+    </div>
+    <button id="settings-btn" title="Paramètres">⚙</button>
+  </div>
+
+  <div id="main">
+    <!-- Left panel -->
+    <div id="left">
+      <div class="card" id="sliders-card">
+        <div class="slider-row" style="margin-bottom:10px">
+          <span class="sicon">🔊</span>
+          <div class="hslider" id="vol-slider">
+            <div class="track"></div>
+            <div class="fill" id="vol-fill"></div>
+            <div class="thumb" id="vol-thumb"></div>
+          </div>
+          <span class="sval" id="vol-val">50</span>
+        </div>
+        <div class="slider-row">
+          <span class="sicon">☀</span>
+          <div class="hslider" id="brt-slider">
+            <div class="track"></div>
+            <div class="fill" id="brt-fill"></div>
+            <div class="thumb" id="brt-thumb"></div>
+          </div>
+          <span class="sval" id="brt-val" style="color:var(--amber)">100</span>
+        </div>
+      </div>
+
+      <div id="mute-panel">
+        <button class="mute-btn" id="mic-btn">
+          <span id="mic-ico">🎙</span>
+          <span class="mlbl">Micro</span>
+        </button>
+        <button class="mute-btn" id="snd-btn">
+          <span id="snd-ico">🔊</span>
+          <span class="mlbl">Son</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Right panel -->
+    <div id="right">
+      <div id="tabbar">
+        <button class="tab active" data-tab="0">⊞ Apps</button>
+        <button class="tab" data-tab="1">⚙ Système</button>
+      </div>
+
+      <div id="pages">
+        <div class="page active" id="page0">
+          <div class="grid" id="apps-grid"></div>
+        </div>
+        <div class="page" id="page1">
+          <div class="grid" id="sys-grid"></div>
+        </div>
+      </div>
+
+      <div id="mediabar">
+        <div id="np">
+          <div id="npt">—</div>
+          <div id="npa"></div>
+        </div>
+        <button class="mbtn" id="btn-prev">⏮</button>
+        <button class="mbtn" id="btn-play">⏯</button>
+        <button class="mbtn" id="btn-next">⏭</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings overlay -->
+<div id="overlay">
+  <div id="settings">
+    <h2>⚙ Connexion</h2>
+    <p>Adresse IP du Mac (visible dans le terminal où tourne server.js)</p>
+    <input type="text" id="ip-inp" placeholder="192.168.1.x" inputmode="decimal" autocomplete="off">
+    <button id="savebtn">Se connecter</button>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+let macIP = localStorage.getItem('macIP') || '';
+let base  = macIP ? `http://${macIP}:3000` : '';
+let vol = 50, brt = 100, muted = false, micMuted = false;
+let running = [], pollTimer = null;
+
+const APPS = [
+  {name:'Safari',            label:'Safari',   emoji:'🌐'},
+  {name:'Visual Studio Code',label:'VS Code',  emoji:'💻'},
+  {name:'Terminal',          label:'Terminal', emoji:'⌨️'},
+  {name:'Spotify',           label:'Spotify',  emoji:'🎵'},
+  {name:'Discord',           label:'Discord',  emoji:'💬'},
+  {name:'Finder',            label:'Finder',   emoji:'📁'},
+  {name:'Mail',              label:'Mail',     emoji:'✉️'},
+  {name:'Notion',            label:'Notion',   emoji:'📝'},
+];
+
+const SYS = [
+  {label:'Verrouiller', emoji:'🔒', cls:'sys',  fn:()=>post('/system/lock')},
+  {label:'Veille écran',emoji:'🌑', cls:'sys',  fn:()=>post('/system/sleep-display')},
+  {label:'Screenshot',  emoji:'📸', cls:'sysc', fn:()=>post('/shortcut',{keys:['cmd','shift','3']})},
+  {label:'Apparence',   emoji:'◐',  cls:'sys',  fn:()=>post('/system/dark-mode'), id:'darkmode'},
+  {label:'Mission Ctrl',emoji:'🪟', cls:'sysc', fn:()=>post('/shortcut',{keys:['F3']})},
+  {label:'Focus/DND',   emoji:'🔕', cls:'sys',  fn:()=>post('/system/dnd'), id:'dnd'},
+  {label:'Sleep Mac',   emoji:'💤', cls:'sys',  fn:()=>post('/system/sleep')},
+  {label:'Corbeille',   emoji:'🗑', cls:'sys',  fn:()=>post('/system/trash')},
+  {label:'Spotlight',   emoji:'🔍', cls:'sysc', fn:()=>post('/shortcut',{keys:['cmd','space']})},
+  {label:'App Switch',  emoji:'⇥',  cls:'sysc', fn:()=>post('/shortcut',{keys:['cmd','tab']})},
+  {label:'Quitter App', emoji:'✕',  cls:'sys',  fn:()=>post('/shortcut',{keys:['cmd','q']})},
+];
+
+// ── API ────────────────────────────────────────────────────────────────────────
+async function req(method, path, body) {
+  try {
+    const r = await fetch(base + path, {
+      method, headers:{'Content-Type':'application/json'},
+      body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(5000),
+    });
+    const d = await r.json();
+    showBanner(null);
+    return d;
+  } catch(e) {
+    showBanner('err','⚠ Mac inaccessible — reconnexion…');
+    return {success:false};
+  }
+}
+const get  = p     => req('GET',  p);
+const post = (p,b) => req('POST', p, b);
+
+// ── Banner ─────────────────────────────────────────────────────────────────────
+function showBanner(cls, txt) {
+  const el = document.getElementById('banner');
+  el.className = cls ? `show ${cls}` : '';
+  if (txt) el.textContent = txt;
+}
+
+// ── Battery ────────────────────────────────────────────────────────────────────
+function updateBattery(pct, charging) {
+  if (pct == null) return;
+  const el = document.getElementById('bat-pct');
+  el.style.display = '';
+  el.textContent = pct + '%';
+  el.style.color = pct < 20 ? '#ef4444' : pct < 40 ? '#f59e0b' : '#10b981';
+  document.getElementById('bat-icon').textContent = charging ? '⚡' : pct < 15 ? '🪫' : '🔋';
+}
+
+// ── Sliders ────────────────────────────────────────────────────────────────────
+function sliderPct(slider, e) {
+  const r = slider.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return Math.max(0, Math.min(100, ((t.clientX - r.left) / r.width) * 100));
+}
+
+function setSlider(fillEl, thumbEl, valEl, pct) {
+  fillEl.style.width  = pct + '%';
+  thumbEl.style.left  = pct + '%';
+  if (valEl) valEl.textContent = Math.round(pct);
+}
+
+function bindSlider(slider, fillEl, thumbEl, valEl, onEnd) {
+  let drag = false;
+  slider.addEventListener('pointerdown', e => {
+    drag = true; slider.setPointerCapture(e.pointerId);
+    setSlider(fillEl, thumbEl, valEl, sliderPct(slider, e));
+  });
+  slider.addEventListener('pointermove', e => {
+    if (!drag) return;
+    setSlider(fillEl, thumbEl, valEl, sliderPct(slider, e));
+  });
+  slider.addEventListener('pointerup', e => {
+    if (!drag) return; drag = false;
+    const p = sliderPct(slider, e);
+    setSlider(fillEl, thumbEl, valEl, p);
+    onEnd(Math.round(p));
+  });
+}
+
+bindSlider(
+  document.getElementById('vol-slider'),
+  document.getElementById('vol-fill'),
+  document.getElementById('vol-thumb'),
+  document.getElementById('vol-val'),
+  v => { vol = v; post('/volume', {value:v}); }
+);
+
+bindSlider(
+  document.getElementById('brt-slider'),
+  document.getElementById('brt-fill'),
+  document.getElementById('brt-thumb'),
+  document.getElementById('brt-val'),
+  v => { brt = v; post('/system/brightness', {value:v}); }
+);
+
+function applyVol(v) {
+  vol = v;
+  setSlider(document.getElementById('vol-fill'), document.getElementById('vol-thumb'),
+            document.getElementById('vol-val'), v);
+}
+function applyBrt(v) {
+  brt = v;
+  setSlider(document.getElementById('brt-fill'), document.getElementById('brt-thumb'),
+            document.getElementById('brt-val'), v);
+}
+
+// ── Mute ──────────────────────────────────────────────────────────────────────
+document.getElementById('mic-btn').addEventListener('click', async () => {
+  const r = await post('/mic/mute');
+  if (r.success) setMic(r.micMuted);
+});
+document.getElementById('snd-btn').addEventListener('click', () => {
+  muted = !muted; setSnd(muted); post('/mute', {muted});
+});
+
+function setMic(v) {
+  micMuted = v;
+  document.getElementById('mic-btn').classList.toggle('on', v);
+  document.getElementById('mic-ico').textContent = v ? '🔇' : '🎙';
+}
+function setSnd(v) {
+  muted = v;
+  document.getElementById('snd-btn').classList.toggle('on', v);
+  document.getElementById('snd-ico').textContent = v ? '🔇' : '🔊';
+}
+
+// ── Media ─────────────────────────────────────────────────────────────────────
+document.getElementById('btn-prev').addEventListener('click', () => post('/media/prev'));
+document.getElementById('btn-play').addEventListener('click', () => post('/media/play-pause'));
+document.getElementById('btn-next').addEventListener('click', () => post('/media/next'));
+
+function updateMedia(np) {
+  document.getElementById('npt').textContent = (np && np.title) ? np.title : '—';
+  document.getElementById('npa').textContent = (np && np.artist) ? np.artist : '';
+}
+
+// ── Flash ──────────────────────────────────────────────────────────────────────
+function flash(el, ok) {
+  el.classList.remove('fok','ferr'); void el.offsetWidth;
+  el.classList.add(ok ? 'fok' : 'ferr');
+  setTimeout(() => el.classList.remove('fok','ferr'), 450);
+}
+
+// ── Apps grid ──────────────────────────────────────────────────────────────────
+function buildApps() {
+  const g = document.getElementById('apps-grid');
+  g.innerHTML = '';
+  APPS.forEach(app => {
+    const btn = document.createElement('button');
+    btn.className = 'dbtn'; btn.dataset.app = app.name;
+
+    const icon = document.createElement('div'); icon.className = 'dicon';
+    const img = document.createElement('img');
+    const em  = document.createElement('span'); em.textContent = app.emoji;
+    img.style.display = 'none';
+    if (base) {
+      img.src = `${base}/app-icon?name=${encodeURIComponent(app.name)}`;
+      img.onload  = () => { img.style.display=''; em.style.display='none'; };
+      img.onerror = () => { img.style.display='none'; em.style.display=''; };
+    }
+    icon.appendChild(img); icon.appendChild(em);
+
+    const lbl = document.createElement('span'); lbl.className='dlbl'; lbl.textContent=app.label;
+    btn.appendChild(icon); btn.appendChild(lbl);
+
+    btn.addEventListener('click', async () => {
+      const r = await post('/launch', {app: app.name});
+      flash(btn, r.success !== false);
+    });
+    g.appendChild(btn);
+  });
+  refreshRunning();
+}
+
+function refreshRunning() {
+  document.querySelectorAll('#apps-grid .dbtn').forEach(btn => {
+    const n = (btn.dataset.app || '').toLowerCase();
+    const on = running.some(r => {
+      const rn = r.toLowerCase();
+      return rn === n || rn.includes(n) || n.includes(rn);
+    });
+    btn.classList.toggle('running', on);
+  });
+}
+
+// ── System grid ───────────────────────────────────────────────────────────────
+function buildSys() {
+  const g = document.getElementById('sys-grid');
+  g.innerHTML = '';
+  SYS.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = `dbtn ${s.cls}`;
+    if (s.id) btn.id = 'sysbtn-' + s.id;
+
+    const icon = document.createElement('div'); icon.className='dicon'; icon.textContent=s.emoji;
+    const lbl  = document.createElement('span'); lbl.className='dlbl'; lbl.textContent=s.label;
+    btn.appendChild(icon); btn.appendChild(lbl);
+
+    btn.addEventListener('click', async () => {
+      const r = await s.fn();
+      flash(btn, r.success !== false);
+      if (s.id) btn.classList.toggle('toggled', !!btn.classList.contains('toggled') === false || r.success);
+    });
+    g.appendChild(btn);
+  });
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    const i = parseInt(t.dataset.tab);
+    document.querySelectorAll('.tab').forEach((b,j) => b.classList.toggle('active', j===i));
+    document.querySelectorAll('.page').forEach((p,j) => p.classList.toggle('active', j===i));
+  });
+});
+
+// ── Sync ──────────────────────────────────────────────────────────────────────
+async function sync() {
+  if (!base) return;
+  const s = await get('/system/status');
+  if (!s.volume && s.volume !== 0) return;
+  applyVol(s.volume);
+  setSnd(s.muted);
+  if (s.micMuted != null) setMic(s.micMuted);
+  if (s.nowPlaying) updateMedia(s.nowPlaying);
+  updateBattery(s.battery, s.charging);
+  if (s.runningApps) { running = s.runningApps; refreshRunning(); }
+  if (s.darkMode != null) {
+    const d = document.getElementById('sysbtn-darkmode');
+    if (d) d.classList.toggle('toggled', s.darkMode);
+  }
+
+  // Brightness separate (not in status yet always available)
+  const br = await get('/system/brightness');
+  if (br.value != null) applyBrt(br.value);
+}
+
+function startPoll() {
+  clearInterval(pollTimer);
+  if (base) pollTimer = setInterval(sync, 5000);
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+document.getElementById('settings-btn').addEventListener('click', () => {
+  document.getElementById('ip-inp').value = macIP;
+  document.getElementById('overlay').classList.add('show');
+});
+document.getElementById('overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('overlay'))
+    document.getElementById('overlay').classList.remove('show');
+});
+document.getElementById('savebtn').addEventListener('click', () => {
+  const ip = document.getElementById('ip-inp').value.trim();
+  macIP = ip; base = ip ? `http://${ip}:3000` : '';
+  localStorage.setItem('macIP', ip);
+  document.getElementById('overlay').classList.remove('show');
+  buildApps();
+  sync(); startPoll();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildApps();
+buildSys();
+applyVol(50); applyBrt(100);
+
+if (!base) {
+  showBanner('err','⚠ Aucun Mac configuré — appuie sur ⚙');
+  setTimeout(() => {
+    document.getElementById('ip-inp').value = macIP;
+    document.getElementById('overlay').classList.add('show');
+  }, 600);
+} else {
+  showBanner('info','⟳ Connexion au Mac…');
+  sync(); startPoll();
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+</script>
+</body>
+</html>
